@@ -16,17 +16,18 @@ import fastprogress
 import wandb
 
 import numpy as np
-import pylab as plt
 
 import torch
 import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 from torch.profiler import record_function
-from whisperspeech import utils
 
 # %% ../nbs/B2. Training (Lightning).ipynb 3
 import lightning.pytorch as pl
 import math
+
+from create_dataset import TrainDataset, TextAudioCollate
+
 
 class TrainingTask(pl.LightningModule):
     def __init__(self, model, model_hparams=None):
@@ -74,6 +75,7 @@ class TrainingTask(pl.LightningModule):
             # Accessing _data_source is flaky and might break
             dataset = self.trainer.fit_loop._data_source.dataloader()
             dataset_size = len(dataset)
+            print(dataset_size)
             # math.ceil so always overestimate (underestimating throws exceptions)
             num_steps = math.ceil(dataset_size / self.trainer.accumulate_grad_batches)
             return num_steps
@@ -147,7 +149,7 @@ parser.add_argument('--validation-data', action='append', type=str, default=[], 
 parser.add_argument('--monitored-metric', type=str, default="val_loss", help='metric to monitor for checkpointing')
 parser.add_argument("--checkpoint-dir", type=str, default="./checkpoints/", help="directory to save the checkpoints")
 parser.add_argument('--epochs', type=int, default=10, help='total training epochs')
-parser.add_argument('--validate-every-n-steps', type=int, default=500, help='how training steps to run between validations')
+parser.add_argument('--validate-every-n-steps', type=int, default=50, help='how training steps to run between validations')
 parser.add_argument('--weight-decay', type=float, default=1e-2, help='optimizer weight decay')
 parser.add_argument('--lr0', type=float, default=1e-4, help='optimizer initial learning rate')
 parser.add_argument('--clip-gradient-norm', type=float, default=None, help='enable gradient norm clipping')
@@ -201,7 +203,6 @@ def parse_dataset_string(s):
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 import datetime
-import webdataset as wds
 import importlib
 
 torch.set_float32_matmul_precision('medium')
@@ -218,46 +219,41 @@ print(name)
 wandb_logger = WandbLogger(project=project, name=name)
 
 ckpt_callback = pl.callbacks.ModelCheckpoint(
-     dirpath=f'{task_name}',
-     filename=f'{task_name}-{name}'+f"-{epoch}-{step}-acc={"+monitored_metric+":.2f}",
-     monitor=monitored_metric,
-     save_top_k=16,
-     train_time_interval=datetime.timedelta(minutes=14),
-     auto_insert_metric_name=False
+    dirpath=f'{task_name}',
+    filename=f'{task_name}-{name}'+"-{epoch}-{step}-acc={"+monitored_metric+":.2f}",
+    monitor=monitored_metric,
+    save_top_k=16,
+    train_time_interval=datetime.timedelta(minutes=14),
+    auto_insert_metric_name=False
 )
 
 lr_monitor_callback = LearningRateMonitor(logging_interval='step')
 
 task = importlib.import_module("whisperspeech."+task_name)
 
-def cycle(dl):
-    while True:
-        for data in dl:
-            yield data
 
 # Dataloader
 collate_fn = TextAudioCollate()
 hps = {
     "data": {
-        "validation_data": "/path/to/validation/file",
-        "training_data": "/path/to/training/file",
-        "semantic_dir": "/path/to/semantic/dir",
+        "validation_data": "/workspace/data/metadata_train.csv",
+        "training_data": "/workspace/data/metadata_eval.csv",
+        "semantic_dir": "/workspace/data/hierspeechpp_dump/repcodec_tokens",
         "max_text_len": 480,
-        "max_semantic_len": 750,
-        "num_codes": 1024
-    }, 
+        "max_semantic_len": 640,
+        "num_codes": 1024,
+    },
     "dataloader": {
-        "batch_size": 48,
+        "batch_size": 4,
         "shuffle": True,
-        "num_workers": 16
-        "drop_last": True
-        "pin_memory": True
+        "num_workers": 16,
+        "drop_last": True,
+        "pin_memory": True,
     }
 }
 
 train_ds = TrainDataset(hps)
-train_loader = DataLoader(ds, **hps["dataloader"], collate_fn=collate_fn)
-train_loader = iter(cycle(train_loader))
+train_loader = DataLoader(train_ds, **hps["dataloader"], collate_fn=collate_fn)
 
 eval_ds = TrainDataset(hps, val=True)
 val_loaders = DataLoader(
@@ -267,9 +263,6 @@ val_loaders = DataLoader(
     num_workers=hps["dataloader"]["num_workers"],
     collate_fn=collate_fn
 )
-val_loaders = iter(cycle(val_loaders))
-
-
 
 tunables = None
 if hasattr(task, "Tunables"):
@@ -281,8 +274,7 @@ if hasattr(task, "Tunables"):
     for name in ["lr0", "clip_gradient_norm", "weight_decay", "warmup_steps"]:
         val = getattr(tunables, name, None)
         if val is not None: hyp_params[name] = val
-
-model_kwargs = dict(dataset=train_dss[0])
+model_kwargs = dict(dataset=train_ds)
 if tunables is not None: model_kwargs['tunables'] = tunables
 model = parse_and_call('model', task.make_model, task_args, model_kwargs)
 

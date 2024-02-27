@@ -219,7 +219,7 @@ wandb_logger = WandbLogger(project=project, name=name)
 
 ckpt_callback = pl.callbacks.ModelCheckpoint(
      dirpath=f'{task_name}',
-     filename=f'{task_name}-{name}'+f"-{epoch}-{step}-acc={"+monitored_metric+":.2f}",
+     filename=f'{task_name}-{name}'+"-{epoch}-{step}-acc={"+monitored_metric+":.2f}",
      monitor=monitored_metric,
      save_top_k=16,
      train_time_interval=datetime.timedelta(minutes=14),

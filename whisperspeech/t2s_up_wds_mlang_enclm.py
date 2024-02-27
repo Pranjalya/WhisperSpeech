@@ -134,8 +134,8 @@ class Tunables:
     encoder_depth_ratio :float = 0.25
     causal_encoder: bool = True
     eot_dropout_p :float = .5
-    cps_input: bool = True
-    cps_bins: int = 32
+    cps_input :bool = True
+    cps_bins :int = 32
         
     lr0 :float = 1.5e-3
     clip_gradient_norm :float = .2
@@ -145,6 +145,8 @@ class Tunables:
     random :bool = False
 
     def __post_init__(self):
+        self.cps_input = True
+        self.causal_encoder = True
         # randomize the hyperparams if requested
         if self.random:
             self.init_std = 10**rand(-1,1)
@@ -228,7 +230,7 @@ class TSARTransformer(nn.Module):
         if tunables.cps_input:
             self.cps_embeddings = nn.Embedding(tunables.cps_bins, self.width)
         else:
-            self.cps_embeddings = None        
+            self.cps_embeddings = None
         
         encoder_depth = int(depth * 2 * tunables.encoder_depth_ratio)
         decoder_depth = depth * 2 - encoder_depth
@@ -300,6 +302,7 @@ class TSARTransformer(nn.Module):
         return xenc, positions, cps_emb
     
     def forward(self, in_ttoks, out_ttoks, languages, cpss, in_stoks, out_stoks=None, in_stoks_positions=None, loss=True, offset=None, xenc=None, xenc_positions=None, cps_emb=None):
+        print(cpss.shape, in_stoks.shape)
         if xenc is None:
             xenc, xenc_positions, cps_emb = self.run_encoder(in_ttoks, languages, cpss)
 
@@ -496,13 +499,13 @@ def _make_model(size:str, tunables:Tunables=Tunables(), dataset=None, **kwargs):
     if size == 'medium':
         return TSARTransformer(depth=24, n_head=16, **kwargs)
 
-def make_model(size:str, frozen_embeddings_model:str=None, tunables:Tunables=Tunables(), dataset:torch.utils.data.Dataset=None):
-    from . import vq_stoks
+def make_model(size:str="medium", frozen_embeddings_model:str=None, tunables:Tunables=Tunables(), dataset:torch.utils.data.Dataset=None):
+    # from . import vq_stoks
 
     if frozen_embeddings_model:
         vqmodel = vq_stoks.RQBottleneckTransformer.load_model(frozen_embeddings_model)
         model = _make_model(size, tunables, dataset, stoks_codes=vqmodel.vq_codes+1, stoks_width=vqmodel.rq.layers[0]._codebook.embed[0].shape[-1])
         model.load_frozen_semantic_embeddings(vqmodel)
     else:
-        model = _make_model(size, tunables, dataset, mode=mode)
+        model = _make_model(size, tunables, dataset)
     return model
