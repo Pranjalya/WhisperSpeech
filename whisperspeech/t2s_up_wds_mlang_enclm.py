@@ -118,6 +118,7 @@ def load_dataset(
 
     return ds
 
+
 # %% ../nbs/5B. Multi-lang text to semantic token modeling.ipynb 12
 def rand(start, end):
     return random.random() * (end - start) + start
@@ -210,7 +211,7 @@ class Encoder(nn.Module):
 # %% ../nbs/5B. Multi-lang text to semantic token modeling.ipynb 15
 class TSARTransformer(nn.Module):
     def __init__(self, depth=6, n_head=6, head_width=64, ffn_mult=4,
-                 ttoks_len=200, ttoks_codes=256, ttoks_width=None,
+                 ttoks_len=480, ttoks_codes=256, ttoks_width=None,
                  stoks_len=1500, stoks_codes=1024, stoks_width=None,
                  tunables=Tunables()):
         super().__init__()
