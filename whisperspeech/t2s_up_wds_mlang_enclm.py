@@ -302,7 +302,6 @@ class TSARTransformer(nn.Module):
         return xenc, positions, cps_emb
     
     def forward(self, in_ttoks, out_ttoks, languages, cpss, in_stoks, out_stoks=None, in_stoks_positions=None, loss=True, offset=None, xenc=None, xenc_positions=None, cps_emb=None):
-        print(cpss.shape, in_stoks.shape)
         if xenc is None:
             xenc, xenc_positions, cps_emb = self.run_encoder(in_ttoks, languages, cpss)
 
@@ -499,7 +498,7 @@ def _make_model(size:str, tunables:Tunables=Tunables(), dataset=None, **kwargs):
     if size == 'medium':
         return TSARTransformer(depth=24, n_head=16, **kwargs)
 
-def make_model(size:str="medium", frozen_embeddings_model:str=None, tunables:Tunables=Tunables(), dataset:torch.utils.data.Dataset=None):
+def make_model(size:str="small", frozen_embeddings_model:str=None, tunables:Tunables=Tunables(), dataset:torch.utils.data.Dataset=None):
     # from . import vq_stoks
 
     if frozen_embeddings_model:

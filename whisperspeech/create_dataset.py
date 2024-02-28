@@ -42,7 +42,7 @@ class TrainDataset(torch.utils.data.Dataset):
         self.semantic_dir = cfg['data']['semantic_dir']
         self.tokenizer = CharTokenizer()
         self.ttoks_len = int(cfg['data'].get("max_text_len", 480))
-        self.stoks_len = int(cfg['data'].get("max_semantic_len", 750))
+        self.stoks_len = int(cfg['data'].get("max_semantic_len", 2020))
         self.stoks_codes = int(cfg['data'].get("num_codes", 1024))
         self.weight = 1
         random.shuffle(self.data)
@@ -51,6 +51,12 @@ class TrainDataset(torch.utils.data.Dataset):
     def get_data(self, item):
         try:
             audiofilepath, text, speaker, language = item.split("|")
+        except Exception as e:
+            if len(item.split("|")) != 4:
+                splits = item.split("|")
+                audiofilepath, speaker, language = splits[0], splits[-2], splits[-1]
+                text = ". ".join(splits[1:-2])
+        try:
             _, filename = audiofilepath.split("/", maxsplit=1)
 
             text = text.strip()
@@ -64,7 +70,7 @@ class TrainDataset(torch.utils.data.Dataset):
             language = languages.to_id(language)
 
             return tokenized_text.detach(), semantic_tokens.detach(), cps, language
-        except:
+        except Exception as e:
             return None
 
 
@@ -80,7 +86,7 @@ class TrainDataset(torch.utils.data.Dataset):
 class TextAudioCollate:
     def __init__(self):
         self.tokenizer = CharTokenizer()
-        self.stoks_len = 640
+        self.stoks_len = 2020
         self.stoks_codes = 1024
         self.ttoks_len = 480
 

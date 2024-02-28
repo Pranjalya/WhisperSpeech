@@ -149,7 +149,7 @@ parser.add_argument('--validation-data', action='append', type=str, default=[], 
 parser.add_argument('--monitored-metric', type=str, default="val_loss", help='metric to monitor for checkpointing')
 parser.add_argument("--checkpoint-dir", type=str, default="./checkpoints/", help="directory to save the checkpoints")
 parser.add_argument('--epochs', type=int, default=10, help='total training epochs')
-parser.add_argument('--validate-every-n-steps', type=int, default=50, help='how training steps to run between validations')
+parser.add_argument('--validate-every-n-steps', type=int, default=1000, help='how training steps to run between validations')
 parser.add_argument('--weight-decay', type=float, default=1e-2, help='optimizer weight decay')
 parser.add_argument('--lr0', type=float, default=1e-4, help='optimizer initial learning rate')
 parser.add_argument('--clip-gradient-norm', type=float, default=None, help='enable gradient norm clipping')
@@ -236,18 +236,18 @@ task = importlib.import_module("whisperspeech."+task_name)
 collate_fn = TextAudioCollate()
 hps = {
     "data": {
-        "validation_data": "/workspace/data/metadata_train.csv",
-        "training_data": "/workspace/data/metadata_eval.csv",
+        "training_data": "/workspace/data/metadata_train.csv",
+        "validation_data": "/workspace/data/metadata_eval.csv",
         "semantic_dir": "/workspace/data/hierspeechpp_dump/repcodec_tokens",
         "max_text_len": 480,
-        "max_semantic_len": 640,
+        "max_semantic_len": 2020,
         "num_codes": 1024,
     },
     "dataloader": {
-        "batch_size": 4,
+        "batch_size": batch_size,
         "shuffle": True,
-        "num_workers": 16,
-        "drop_last": True,
+        "num_workers": num_workers,
+        "drop_last": False,
         "pin_memory": True,
     }
 }
@@ -256,7 +256,7 @@ train_ds = TrainDataset(hps)
 train_loader = DataLoader(train_ds, **hps["dataloader"], collate_fn=collate_fn)
 
 eval_ds = TrainDataset(hps, val=True)
-val_loaders = DataLoader(
+val_loader = DataLoader(
     eval_ds,
     batch_size=1,
     shuffle=False,
@@ -300,4 +300,4 @@ if type(wandb_logger.experiment.config) == wandb.sdk.wandb_config.Config:
 kwargs = {}
 if 'resume_from' in args:
     kwargs['ckpt_path'] = args['resume_from']
-trainer.fit(model=task, train_dataloaders=train_loader, val_dataloaders=val_loaders, **kwargs)
+trainer.fit(model=task, train_dataloaders=train_loader, val_dataloaders=val_loader, **kwargs)
